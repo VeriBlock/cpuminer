@@ -343,9 +343,23 @@ err_out:
 	return false;
 }
 
+static void tool_invert_buffer(void* buf, size_t bufSize)
+{
+    unsigned char* p = (unsigned char*)(buf);
+    
+    for (size_t i=0; i<bufSize/2; i++)
+    {
+        unsigned char t = 0;
+        t = p[i];
+        p[i] = p[bufSize - 1 - i];
+        p[bufSize - 1 - i] = t;
+    }
+}
+
+
 static bool gbt_work_decode(const json_t *val, struct work *work)
 {
-	int i, n, k = 0;
+	unsigned int x, i, n, k = 0;
 	uint32_t version, curtime, bits;
 	uint32_t prevhash[8];
 	uint32_t target[8];
@@ -398,12 +412,13 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 		goto out;
 	}
 	work->height = json_integer_value(tmp);
+        
 	// VeriBlock: put height into first 4 bytes of unauthcontext
         unauthcontext[k++] = (work->height & 0xff000000u) >> 24u;
         unauthcontext[k++] = (work->height & 0x00ff0000u) >> 16u;
         unauthcontext[k++] = (work->height & 0x0000ff00u) >> 8u;
         unauthcontext[k++] = (work->height & 0x000000ffu) >> 0u;
-
+        
 	tmp = json_object_get(val, "version");
 	if (!tmp || !json_is_integer(tmp)) {
 		applog(LOG_ERR, "JSON invalid version");
@@ -451,7 +466,8 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 	if (tmp) {
 		const char *cbtx_hex = json_string_value(json_object_get(tmp, "data"));
 		cbtx_size = cbtx_hex ? strlen(cbtx_hex) / 2 : 0;
-		cbtx = malloc(cbtx_size + 100);
+		cbtx = malloc(cbtx_size + 1000);
+                memset(cbtx, 0, cbtx_size + 1000);
 		if (cbtx_size < 60 || !hex2bin(cbtx, cbtx_hex, cbtx_size)) {
 			applog(LOG_ERR, "JSON invalid coinbasetxn");
 			goto out;
@@ -473,7 +489,9 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 		}
 		cbvalue = json_is_integer(tmp) ? json_integer_value(tmp) : json_number_value(tmp);
 		// VeriBlock:
-		cbtx = malloc(256 + pop_root_size);
+                size_t cbtxSize = 1000 + pop_root_size;
+		cbtx = malloc(cbtxSize);
+                memset(cbtx, 0, cbtxSize);
 		le32enc((uint32_t *)cbtx, 1); /* version */
 		cbtx[4] = 1; /* in-counter */
 		memset(cbtx+5, 0x00, 32); /* prev txout hash */
@@ -542,12 +560,15 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
           // copy pop root into coinbase
           const char* pop_root = json_string_value(tmp);
           unsigned char buf[pop_root_size];
+          memset(buf, 0, sizeof(buf));
           n = pop_root ? strlen(pop_root) / 2 : 0;
           if(!pop_root || n != pop_root_size || !hex2bin(buf, pop_root, n)) {
             applog(LOG_ERR, "JSON invalid pop_witness_commitment");
             goto out;
           }
-          memcpy(cbtx + cbtx_size, pop_root, pop_root_size);
+          
+          memcpy(cbtx + cbtx_size, buf, pop_root_size);
+          cbtx_size += pop_root_size;
         }
 
 	if (coinbase_append) {
@@ -622,9 +643,19 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
           }
           k += 32; // sizeof(keystone hash)
         }
+        
+        const int keystoneSize = 32;
+        for (k=0; k<2; k++)
+        {
+            unsigned char *ks_begin = unauthcontext + 4 + k*keystoneSize;
+            tool_invert_buffer(ks_begin, keystoneSize);
+        }
 
 	/* generate merkle root */
-	merkle_tree = malloc(32 * ((1 + tx_count + 1) & ~1));
+        unsigned long mtreeSize = 32 * ((1 + tx_count + 1) & ~1);
+	merkle_tree = malloc(mtreeSize);
+        memset(merkle_tree, 0, mtreeSize);
+        
 	sha256d(merkle_tree[0], cbtx, cbtx_size);
 	for (i = 0; i < tx_count; i++) {
 		tmp = json_array_get(txa, i);
@@ -666,10 +697,14 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
         // to do this, copy existing merkle_root[0] into merkle_root[1]
         // then copy sha256d(unauthcontext) into merkle_root[0]
         // and do one more round of hashing
-        memcpy(merkle_tree[1], merkle_tree[0], 32);
-	sha256d(merkle_tree[0], unauthcontext, unauthcontext_size);
-        sha256d(merkle_tree[0], merkle_tree[0], 64); // last round of hashing
+        
+        memcpy (merkle_tree[1], merkle_tree[0], sizeof(merkle_tree[0]));
+        sha256d(merkle_tree[0], unauthcontext, unauthcontext_size);
+        unsigned char resultTreeHash[32] = {};
+        sha256d(resultTreeHash, merkle_tree, mtreeSize); // last round of hashing
+        memcpy(merkle_tree[0], resultTreeHash, sizeof(resultTreeHash));
 
+        
 	/* assemble block header */
 	work->data[0] = swab32(version);
 	for (i = 0; i < 8; i++)
@@ -2043,6 +2078,7 @@ int main(int argc, char *argv[])
 			tq_push(thr_info[stratum_thr_id].q, strdup(rpc_url));
 	}
 
+        
 	/* start mining threads */
 	for (i = 0; i < opt_n_threads; i++) {
 		thr = &thr_info[i];
