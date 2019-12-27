@@ -343,19 +343,6 @@ err_out:
 	return false;
 }
 
-static void tool_invert_buffer(void* buf, size_t bufSize)
-{
-    unsigned char* p = (unsigned char*)(buf);
-    
-    for (size_t i=0; i<bufSize/2; i++)
-    {
-        unsigned char t = 0;
-        t = p[i];
-        p[i] = p[bufSize - 1 - i];
-        p[bufSize - 1 - i] = t;
-    }
-}
-
 static bool gbt_work_decode(const json_t *val, struct work *work)
 {
 	unsigned int x, i, n, k = 0;
@@ -650,12 +637,12 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
           k += 32; // sizeof(keystone hash)
         }
         
-    const int keystoneSize = 32;
-    for (k=0; k<2; k++)
-    {
-        unsigned char *ks_begin = unauthcontext + 4 + k*keystoneSize;
-        tool_invert_buffer(ks_begin, keystoneSize);
-    }
+	const int keystoneSize = 32;
+	for (k=0; k<2; k++)
+	{
+		unsigned char *ks_begin = unauthcontext + 4 + k*keystoneSize;
+		memrev(ks_begin, keystoneSize);
+	}
 
 	/* generate merkle root */
     unsigned long mtreeSize = 32 * ((1 + tx_count + 1) & ~1);
