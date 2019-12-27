@@ -502,7 +502,7 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 		memcpy(cbtx+cbtx_size, pk_script, pk_script_size);
 		cbtx_size += pk_script_size;
 
-        //=================================================================
+		//=================================================================
 		// Adding new output with POP root
 		memset(cbtx+cbtx_size, 0, 8); /* value */
 		cbtx_size += 8;
