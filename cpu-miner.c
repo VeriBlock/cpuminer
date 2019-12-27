@@ -489,9 +489,9 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 		cbvalue = json_is_integer(tmp) ? json_integer_value(tmp) : json_number_value(tmp);
 		
         // VeriBlock:
-        size_t cbtxSize = 1000 + pop_root_size;
+		size_t cbtxSize = 1000 + pop_root_size;
 		cbtx = malloc(cbtxSize);
-        memset(cbtx, 0, cbtxSize);
+		memset(cbtx, 0, cbtxSize);
 		le32enc((uint32_t *)cbtx, 1); /* version */
 		cbtx[4] = 1; /* in-counter */
 		memset(cbtx+5, 0x00, 32); /* prev txout hash */
