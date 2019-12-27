@@ -504,26 +504,26 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 
         //=================================================================
 		// Adding new output with POP root
-        memset(cbtx+cbtx_size, 0, 8); /* value */
-        cbtx_size += 8;
-        cbtx[cbtx_size++] = pop_root_size; /* txout-script length */
+		memset(cbtx+cbtx_size, 0, 8); /* value */
+		cbtx_size += 8;
+		cbtx[cbtx_size++] = pop_root_size; /* txout-script length */
                             
-        // VeriBlock INSERT POP_ROOT:
-        tmp = json_object_get(val, "pop_witness_commitment");
-        if(tmp) {
-            // copy pop root into coinbase
-            const char* pop_root = json_string_value(tmp);
-            unsigned char buf[pop_root_size];
-            memset(buf, 0, sizeof(buf));
-            n = pop_root ? strlen(pop_root) / 2 : 0;
-            if(!pop_root || n != pop_root_size || !hex2bin(buf, pop_root, n)) {
-                    applog(LOG_ERR, "JSON invalid pop_witness_commitment");
-                    goto out;
-            }
-            memcpy(cbtx + cbtx_size, buf, pop_root_size);
-            cbtx_size += pop_root_size;
-        }
-        //=================================================================
+		// VeriBlock INSERT POP_ROOT:
+		tmp = json_object_get(val, "pop_witness_commitment");
+		if(tmp) {
+			// copy pop root into coinbase
+			const char* pop_root = json_string_value(tmp);
+			unsigned char buf[pop_root_size];
+			memset(buf, 0, sizeof(buf));
+			n = pop_root ? strlen(pop_root) / 2 : 0;
+			if(!pop_root || n != pop_root_size || !hex2bin(buf, pop_root, n)) {
+				applog(LOG_ERR, "JSON invalid pop_witness_commitment");
+				goto out;
+			}
+			memcpy(cbtx + cbtx_size, buf, pop_root_size);
+			cbtx_size += pop_root_size;
+		}
+		//=================================================================
                                 
 		if (segwit) {
 			unsigned char (*wtree)[32] = calloc(tx_count + 2, 32);
