@@ -363,7 +363,7 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 	// VeriBlock:
 	const int keystones_total = 2;
 	const int unauthcontext_size = 4 /* sizeof(int) */ + keystones_total * 32;
-        unsigned char unauthcontext[unauthcontext_size];
+	unsigned char unauthcontext[unauthcontext_size];
 	const int pop_root_size = 36;
 
 	tmp = json_object_get(val, "rules");
@@ -400,10 +400,10 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 	work->height = json_integer_value(tmp);
         
 	// VeriBlock: put height into first 4 bytes of unauthcontext
-    unauthcontext[k++] = (work->height & 0xff000000u) >> 24u;
-    unauthcontext[k++] = (work->height & 0x00ff0000u) >> 16u;
-    unauthcontext[k++] = (work->height & 0x0000ff00u) >> 8u;
-    unauthcontext[k++] = (work->height & 0x000000ffu) >> 0u;
+	unauthcontext[k++] = (work->height & 0xff000000u) >> 24u;
+	unauthcontext[k++] = (work->height & 0x00ff0000u) >> 16u;
+	unauthcontext[k++] = (work->height & 0x0000ff00u) >> 8u;
+	unauthcontext[k++] = (work->height & 0x000000ffu) >> 0u;
         
 	tmp = json_object_get(val, "version");
 	if (!tmp || !json_is_integer(tmp)) {
@@ -453,7 +453,7 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 		const char *cbtx_hex = json_string_value(json_object_get(tmp, "data"));
 		cbtx_size = cbtx_hex ? strlen(cbtx_hex) / 2 : 0;
 		cbtx = malloc(cbtx_size + 1000);
-        memset(cbtx, 0, cbtx_size + 1000);
+		memset(cbtx, 0, cbtx_size + 1000);
 		if (cbtx_size < 60 || !hex2bin(cbtx, cbtx_hex, cbtx_size)) {
 			applog(LOG_ERR, "JSON invalid coinbasetxn");
 			goto out;
@@ -503,6 +503,7 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 		cbtx_size += pk_script_size;
 
         //=================================================================
+		// Adding new output with POP root
         memset(cbtx+cbtx_size, 0, 8); /* value */
         cbtx_size += 8;
         cbtx[cbtx_size++] = pop_root_size; /* txout-script length */
@@ -687,14 +688,14 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 
 	// VeriBlock: merkle_tree[0] is a btc merkle root
 	// calculate top level merkle root as sha256d(sha256d(unauthcontext) || merkle_root[0])
-    // to do this, copy existing merkle_root[0] into merkle_root[1]
-    // then copy sha256d(unauthcontext) into merkle_root[0]
-    // and do one more round of hashing
-    memcpy (merkle_tree[1], merkle_tree[0], sizeof(merkle_tree[0]));
-    sha256d(merkle_tree[0], unauthcontext, unauthcontext_size);
-    unsigned char resultTreeHash[32] = {};
-    sha256d(resultTreeHash, merkle_tree, mtreeSize); // last round of hashing
-    memcpy(merkle_tree[0], resultTreeHash, sizeof(resultTreeHash));
+	// to do this, copy existing merkle_root[0] into merkle_root[1]
+	// then copy sha256d(unauthcontext) into merkle_root[0]
+	// and do one more round of hashing
+	memcpy (merkle_tree[1], merkle_tree[0], sizeof(merkle_tree[0]));
+	sha256d(merkle_tree[0], unauthcontext, unauthcontext_size);
+	unsigned char resultTreeHash[32] = {};
+	sha256d(resultTreeHash, merkle_tree, mtreeSize); // last round of hashing
+	memcpy(merkle_tree[0], resultTreeHash, sizeof(resultTreeHash));
         
 	/* assemble block header */
 	work->data[0] = swab32(version);
