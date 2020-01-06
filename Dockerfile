@@ -6,12 +6,12 @@
 #
 
 FROM            ubuntu:16.04
-MAINTAINER      Guillaume J. Charmes <guillaume@charmes.net>
+MAINTAINER      VeriBlock 
 
 RUN             apt-get update -qq && \
                 apt-get install -qqy automake libcurl4-openssl-dev git make gcc
 
-COPY            vbk-ri-btc-cpuminer /vbk-ri-btc-cpuminer
+RUN            git clone https://github.com/VeriBlock/vbk-ri-btc-cpuminer.git
 
 RUN             cd vbk-ri-btc-cpuminer && \
                 ./autogen.sh && \
