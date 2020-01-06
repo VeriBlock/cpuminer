@@ -11,12 +11,12 @@ MAINTAINER      Guillaume J. Charmes <guillaume@charmes.net>
 RUN             apt-get update -qq && \
                 apt-get install -qqy automake libcurl4-openssl-dev git make gcc
 
-RUN             git clone https://github.com/pooler/cpuminer
+COPY            vbk-ri-btc-cpuminer /vbk-ri-btc-cpuminer
 
-RUN             cd cpuminer && \
+RUN             cd vbk-ri-btc-cpuminer && \
                 ./autogen.sh && \
                 ./configure CFLAGS="-O3" && \
                 make
 
-WORKDIR         /cpuminer
+WORKDIR         /vbk-ri-btc-cpuminer
 ENTRYPOINT      ["./minerd"]
