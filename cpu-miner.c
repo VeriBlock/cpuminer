@@ -364,7 +364,7 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 	const int keystones_total = 2;
 	const int unauthcontext_size = 4 /* sizeof(int) */ + keystones_total * 32;
 	unsigned char unauthcontext[unauthcontext_size];
-	const int pop_root_size = 36;
+	const int pop_root_size = 37;
 
 	tmp = json_object_get(val, "rules");
 	if (tmp && json_is_array(tmp)) {
@@ -404,6 +404,15 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 	unauthcontext[k++] = (work->height & 0x00ff0000u) >> 16u;
 	unauthcontext[k++] = (work->height & 0x0000ff00u) >> 8u;
 	unauthcontext[k++] = (work->height & 0x000000ffu) >> 0u;
+    
+    // read pop_rewards
+    json_t *pop_rewards = json_object_get(val, "pop_rewards");
+    if (!pop_rewards || !json_is_array(pop_rewards)) {
+        applog(LOG_ERR, "JSON invalid pop_rewards");
+        goto out;
+    }
+    
+    const int pop_rewards_count = json_array_size(pop_rewards);
         
 	tmp = json_object_get(val, "version");
 	if (!tmp || !json_is_integer(tmp)) {
@@ -476,7 +485,7 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 		cbvalue = json_is_integer(tmp) ? json_integer_value(tmp) : json_number_value(tmp);
 		
         // VeriBlock:
-		size_t cbtxSize = 1000 + pop_root_size;
+		size_t cbtxSize = 1000 + pop_root_size + pop_rewards_count * 200;
 		cbtx = malloc(cbtxSize);
 		memset(cbtx, 0, cbtxSize);
 		le32enc((uint32_t *)cbtx, 1); /* version */
@@ -494,7 +503,7 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 		cbtx[41] = cbtx_size - 42; /* scriptsig length */
 		le32enc((uint32_t *)(cbtx+cbtx_size), 0xffffffff); /* sequence */
 		cbtx_size += 4;
-		cbtx[cbtx_size++] = (segwit ? 2 : 1) + 1; /* out-counter */
+		cbtx[cbtx_size++] = (segwit ? 2 : 1) + 1 + pop_rewards_count; /* out-counter */
 		le32enc((uint32_t *)(cbtx+cbtx_size), (uint32_t)cbvalue); /* value */
 		le32enc((uint32_t *)(cbtx+cbtx_size+4), cbvalue >> 32);
 		cbtx_size += 8;
@@ -523,6 +532,36 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 			memcpy(cbtx + cbtx_size, buf, pop_root_size);
 			cbtx_size += pop_root_size;
 		}
+        
+        // VeriBlock INSERT POP_REWARDS
+        if(pop_rewards_count) {
+            int64_t pop_amount;
+            for(i = 0; i < pop_rewards_count; i++) {
+                const json_t *reward_info = json_array_get(pop_rewards, i);
+                tmp = json_object_get(reward_info, "amount");
+                pop_amount = json_is_integer(tmp) ? json_integer_value(tmp) : json_number_value(tmp);
+                le32enc((uint32_t *)(cbtx+cbtx_size), (uint32_t)pop_amount); /* value */
+                le32enc((uint32_t *)(cbtx+cbtx_size+4), pop_amount >> 32);
+                cbtx_size += 8;
+                
+                tmp = json_object_get(reward_info, "payout_info");
+                const char* pop_payout = json_string_value(tmp);
+                n = pop_payout ? strlen(pop_payout) / 2 : 0;
+                unsigned char buf[n];
+                memset(buf, 0, sizeof(buf));
+                
+                if(!pop_payout || !hex2bin(buf, pop_payout, n)) {
+                    applog(LOG_ERR, "JSON invalid pop reward payout_info");
+                    goto out;
+                }
+                
+                cbtx[cbtx_size++] = n; /* txout-script length */
+                
+                memcpy(cbtx + cbtx_size, buf, n);
+                cbtx_size += n;
+            }
+ 
+        }
 		//=================================================================
                                 
 		if (segwit) {
@@ -628,6 +667,7 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
           applog(LOG_ERR, "Expected to get %d keystones, but got %d", keystones_total, keystone_count);
           goto out;
         }
+
         for (i = 0; i < keystone_count; i++) {
           const json_t *ks = json_array_get(keystones, i);
           const char *ks_hex = json_string_value(ks);
@@ -687,12 +727,9 @@ static bool gbt_work_decode(const json_t *val, struct work *work)
 	}
 
 	// VeriBlock: merkle_tree[0] is a btc merkle root
-	// calculate top level merkle root as sha256d(sha256d(unauthcontext) || merkle_root[0])
-	// to do this, copy existing merkle_root[0] into merkle_root[1]
-	// then copy sha256d(unauthcontext) into merkle_root[0]
-	// and do one more round of hashing
-	memcpy (merkle_tree[1], merkle_tree[0], sizeof(merkle_tree[0]));
-	sha256d(merkle_tree[0], unauthcontext, unauthcontext_size);
+	// calculate top level merkle root as sha256d(merkle_root[0] || sha256d(unauthcontext))
+    
+    sha256d(merkle_tree[1], unauthcontext, unauthcontext_size);
 	unsigned char resultTreeHash[32] = {};
 	sha256d(resultTreeHash, merkle_tree, mtreeSize); // last round of hashing
 	memcpy(merkle_tree[0], resultTreeHash, sizeof(resultTreeHash));
