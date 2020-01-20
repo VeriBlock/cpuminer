@@ -11,12 +11,12 @@ MAINTAINER      VeriBlock
 RUN             apt-get update -qq && \
                 apt-get install -qqy automake libcurl4-openssl-dev git make gcc
 
-RUN            git clone https://github.com/VeriBlock/vbk-ri-btc-cpuminer.git
-
-RUN             cd vbk-ri-btc-cpuminer && \
+ADD             . /cpuminer
+RUN             (  \
+                cd /cpuminer && \
                 ./autogen.sh && \
                 ./configure CFLAGS="-O3" && \
-                make
+                make)
 
-WORKDIR         /vbk-ri-btc-cpuminer
+WORKDIR         /cpuminer
 ENTRYPOINT      ["./minerd"]
