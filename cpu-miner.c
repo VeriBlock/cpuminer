@@ -128,6 +128,7 @@ static int opt_fail_pause = 30;
 int opt_timeout = 0;
 static int opt_scantime = 5;
 static enum algos opt_algo = ALGO_SCRYPT;
+static int opt_wait = 0;
 static int opt_scrypt_n = 1024;
 static int opt_n_threads;
 static int num_processors;
@@ -173,6 +174,7 @@ Options:\n\
                           scrypt:N  scrypt(N, 1, 1)\n\
                           sha256d   SHA-256d\n\
   -o, --url=URL         URL of mining server\n\
+  -w, --wait=N          Wait N seconds before mining next block\n\
   -O, --userpass=U:P    username:password pair for mining server\n\
   -u, --user=USERNAME   username for mining server\n\
   -p, --pass=PASSWORD   password for mining server\n\
@@ -249,6 +251,7 @@ static struct option const options[] = {
 	{ "threads", 1, NULL, 't' },
 	{ "timeout", 1, NULL, 'T' },
 	{ "url", 1, NULL, 'o' },
+	{ "wait", 1, NULL, 'w' },
 	{ "user", 1, NULL, 'u' },
 	{ "userpass", 1, NULL, 'O' },
 	{ "version", 0, NULL, 'V' },
@@ -940,6 +943,8 @@ static const char *gbt_lp_req =
 
 static bool get_upstream_work(CURL *curl, struct work *work)
 {
+        sleep(opt_wait);
+
 	json_t *val;
 	int err;
 	bool rc;
@@ -1664,7 +1669,13 @@ static void parse_arg(int key, char *arg, char *pname)
 	int v, i;
 
 	switch(key) {
-	case 'a':
+	case 'w':
+          v = atoi(arg);
+          if (v < 0 || v > 9999)	/* sanity check */
+            show_usage_and_exit(1);
+          opt_wait = v;
+          break;
+        case 'a':
 		for (i = 0; i < ARRAY_SIZE(algo_names); i++) {
 			v = strlen(algo_names[i]);
 			if (!strncmp(arg, algo_names[i], v)) {
