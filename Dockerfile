@@ -19,4 +19,4 @@ RUN             (  \
                 make)
 
 WORKDIR         /cpuminer
-ENTRYPOINT      ["./minerd"]
+ENTRYPOINT      ["./docker-entrypoint.sh", "./minerd"]
