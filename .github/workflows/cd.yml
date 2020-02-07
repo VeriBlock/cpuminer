@@ -23,5 +23,4 @@ jobs:
           dockerfile: Dockerfile
           username: ${{ secrets.PUBLIC_DOCKERHUB_USERNAME }}
           password: ${{ secrets.PUBLIC_DOCKERHUB_PASSWORD }}
-          tag_names: true
           snapshot: true
